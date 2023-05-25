@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <boost/smart_ptr/make_shared_array.hpp>
 #include <condition_variable>
 #include <map>
 #include <memory>
@@ -341,7 +342,7 @@ private:
         [this, &result_ready,
         &cond_result](ROS1ClientGoalHandle goal_handle) mutable           // transition_cb
         {
-          ROS_INFO("Goal [%s]", goal_handle.getCommState().toString().c_str());
+          ROS_INFO("Goal Comm State [%s]", goal_handle.getCommState().toString().c_str());
           if (goal_handle.getCommState() == actionlib::CommState::RECALLING) {
             // cancelled before being processed
             auto result2 = std::make_shared<ROS2Result>();
@@ -353,11 +354,23 @@ private:
           } else if (goal_handle.getCommState() == actionlib::CommState::DONE) {
             auto result2 = std::make_shared<ROS2Result>();
             auto result1 = goal_handle.getResult();
-            translate_result_1_to_2(*result2, *result1);
-            ROS_INFO("Goal [%s]", goal_handle.getTerminalState().toString().c_str());
+
+            ROS_INFO("Goal Terminal State [%s]", goal_handle.getTerminalState().toString().c_str());
+
             if (goal_handle.getTerminalState() == actionlib::TerminalState::SUCCEEDED) {
+              translate_result_1_to_2(
+                  *result2,
+                  *result1
+              );
               gh2_->succeed(result2);
             } else {
+              if (result1) {
+                // In case of a present result translate it to ros2, otherwise proceed!
+                translate_result_1_to_2(
+                    *result2,
+                    *result1
+                );
+              }
               gh2_->abort(result2);
             }
             result_ready = true;
